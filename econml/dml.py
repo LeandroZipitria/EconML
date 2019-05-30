@@ -195,6 +195,37 @@ class _RLearner(LinearCateEstimator):
         effect = self.effect(X_test)
         return effect - error, effect + error
 
+    def local_conformal(self, X_test, Y, T, X, W=None, alpha=.05):
+        if self._discrete_treatment:
+            T = self._one_hot_encoder.transform(reshape(self._label_encoder.transform(T), (-1, 1)))[:, 1:]
+        if T.ndim == 1:
+            T = reshape(T, (-1, 1))
+        if Y.ndim == 1:
+            Y = reshape(Y, (-1, 1))
+        if X is None:
+            X = np.ones((shape(Y)[0], 1))
+        if W is None:
+            W = np.empty((shape(Y)[0], 0))
+        Y_test_pred = np.zeros(shape(Y) + (self._n_splits,))
+        T_test_pred = np.zeros(shape(T) + (self._n_splits,))
+        for ind in range(self._n_splits):
+            if self._discrete_treatment:
+                T_test_pred[:, :, ind] = reshape(self._models_t[ind].predict(X, W)[:, 1:], shape(T))
+            else:
+                T_test_pred[:, :, ind] = reshape(self._models_t[ind].predict(X, W), shape(T))
+            Y_test_pred[:, :, ind] = reshape(self._models_y[ind].predict(X, W), shape(Y))
+        Y_test_pred = Y_test_pred.mean(axis=2)
+        T_test_pred = T_test_pred.mean(axis=2)
+        Y_test_res = Y - Y_test_pred
+        T_test_res = T - T_test_pred
+        effects = reshape(self._model_final.predict(X), (-1, shape(Y)[1], shape(T)[1]))
+        Y_test_res_pred = reshape(np.einsum('ijk,ik->ij', effects, T_test_res), shape(Y))
+        error = np.zeros(X.shape[0])
+        effect = self.effect(X_test)
+        for id, x in enumerate(X_test):
+            neighbs = np.argsort(np.linalg.norm(X-x.reshape(1, -1), axis=1))[:100]
+            error[id] = np.percentile(np.abs(Y_test_res[neighbs] - Y_test_res_pred[neighbs]), (1-alpha/2)*100)
+        return effect - error, effect + error
 
 class _DMLCateEstimatorBase(_RLearner):
     """
