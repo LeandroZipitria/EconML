@@ -192,8 +192,8 @@ class _RLearner(LinearCateEstimator):
         effects = reshape(self._model_final.predict(X), (-1, shape(Y)[1], shape(T)[1]))
         Y_test_res_pred = reshape(np.einsum('ijk,ik->ij', effects, T_test_res), shape(Y))
         error = np.percentile(np.abs(Y_test_res - Y_test_res_pred), (1-alpha/2)*100)
-        effect = self.effect(X)
-        return effect + error, effect - error
+        effect = self.effect(X_test)
+        return effect - error, effect + error
 
 
 class _DMLCateEstimatorBase(_RLearner):
