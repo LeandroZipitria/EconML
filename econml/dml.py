@@ -220,10 +220,11 @@ class _RLearner(LinearCateEstimator):
         T_test_res = T - T_test_pred
         effects = reshape(self._model_final.predict(X), (-1, shape(Y)[1], shape(T)[1]))
         Y_test_res_pred = reshape(np.einsum('ijk,ik->ij', effects, T_test_res), shape(Y))
-        error = np.zeros(X.shape[0])
+        error = np.zeros(X_test.shape[0])
         effect = self.effect(X_test)
+        k_neighbs = max(100, int(np.ceil(np.sqrt(X.shape[0]))))
         for id, x in enumerate(X_test):
-            neighbs = np.argsort(np.linalg.norm(X-x.reshape(1, -1), axis=1))[:100]
+            neighbs = np.argsort(np.linalg.norm(X-x.reshape(1, -1), axis=1))[:k_neighbs]
             error[id] = np.percentile(np.abs(Y_test_res[neighbs] - Y_test_res_pred[neighbs]), (1-alpha/2)*100)
         return effect - error, effect + error
 
